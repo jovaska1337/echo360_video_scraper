@@ -1,13 +1,19 @@
 ### echo360 Video Scraper
 This tool consists of two parts:
+
 1. A Firefox extension which extracts video stream urls and cookies.
 2. A python script which performs downloading and video conversion.
+
 The following executables are required to be in `PATH`:
+
 - `ffmpeg`
 - `ffprobe`
+
 The following python libraries are required:
+
 - `requests`
 - (everything else should be part of a standard python installation)
+
 #### Rationale
 Have you ever wanted you view your favourite lecture videos using your
 favorite media player without requiring internet connectivity? Are you
@@ -19,11 +25,14 @@ jump through all the ridiculous hoops to retreive the stream urls and
 authentication cookies is frankly impossible. Using the existing browser
 session to retreive metadata through and extension is the simplest and
 easiest way to implement this.
+
 #### Instructions
 To use the browser extension, you have to be on on an echo360.org.uk
 page with one of the following urls:
+
 - `https://echo360.org.uk/section/<uuid>/home`
 - `https://echo360.org.uk/media/<uuid>/\*`
+
 You can then use the extension popup window to select which video
 streams you want to download. (`/media` pages will always show one)
 After selecting the streams and clicking `Go`, the extension will
