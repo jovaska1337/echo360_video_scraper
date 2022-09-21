@@ -92,7 +92,7 @@ for file in "$@"; do
 		# create copy on the same filesystem without replacing file
 		cp "$tmp" "$file.new"
 		if [ $? -ne 0 ]; then
-			echo "cp: nonzero exist status."
+			echo "cp: nonzero exit status."
 			break
 		fi
 

@@ -39,28 +39,28 @@ page with one of the following urls:
 1. Navigate to an echo360 classroom or media page with an url like the
    ones above on a browser with the extension installed.
 2. Open the extension popup. (refresh the page if nothing shows up)
-3. Select the streams you want to download. (`/media` pages always give one)
+3. Select the streams you want to download. (`/media` pages always show one)
 4. Click `Go`.
 5. After the tool scrapes the authentication cookies and video stream urls,
-   You'll be prompted to save a file called `echo360.txt`. `echo360.py` will
+   you'll be prompted to save a file called `echo360.txt`. `echo360.py` will
    take this file as input from stdin.
 6. Save the file into the directory you want to download the streams into.
-   If you have a POSIX shell available, you can use `echo360.sh` to pipe
-   multiple `echo360.txt` files into `echo360.py` by saving them with the
+   If you have a POSIX compatible shell available, you can use `echo360.sh` to
+   pipe multiple `echo360.txt` files into `echo360.py` by saving them with the
    format `echo360*.txt`. (files will be concatenated in the filesystem order)
 7. When you have downloaded all the video stream metadata, either invoke
-   `echo360.py` directly, piping `echo360.txt` into stdin (
-   `python echo360.py < echo360.txt`) or invoke `echo360.sh` in the directoy
+   `echo360.py` directly, piping `echo360.txt` into stdin
+   (`python echo360.py < echo360.txt`) or invoke `echo360.sh` in the directory
    with all the `echo360.txt` files.
 8. `echo360.py` will then select the streams with the highest quality,
    download the streams onto disk and either re-encode or remux the streams
-   into a single video file depending on the internal configuration. It's
-   safe to interrupt the script with `SIGINT` (`CTRL+C`). The script will
-   clean up all files if it executes without errors. Re-executing after
-   errors should resume correctly. (only partial re-encodes/remuxes are
-   discarded)
+   with ffmpeg into  a single video file depending on the internal configuration.
+   (see the script for details) It's safe to interrupt the script with `SIGINT`
+   (`CTRL+C`). The script will clean up all temporary files if it executes without
+   errors. Re-executing after errors should resume correctly. (only partial
+   re-encodes/remuxes are discarded)
 9. If the volume of the resultant video file is too low, you can use
-   `volume.sh` to fix volume levels. (POSIX shell required) Multiple
-   paths can be specified. The default configuration can be overridden
+   `volume.sh` to fix volume levels. (POSIX compatible shell required)
+   Multiple paths can be specified. The default configuration can be overridden
    through the command line. (see the script for details) You can simply
    invoke it as follows: `./volume.sh <video path>`
