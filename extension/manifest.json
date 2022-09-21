@@ -1,0 +1,25 @@
+{
+	"manifest_version": 2,
+	"browser_specific_settings": {
+		"gecko": { "id": "echo360_video_scraper@nodomain" } },
+	"name": "echo360 Video Scraper",
+	"version": "0.1",
+	"description": "Scrapes video stream URLs and metadata from echo360 classrooms.",
+	"icons": { "48": "icons/48.png", "96": "icons/96.png" },
+	"permissions": [
+		"*://echo360.org.uk/*",
+		"cookies" ],
+	"background": { "scripts": [ "background.js" ] },
+	"content_scripts": [ {
+		"matches": [ "*://echo360.org.uk/section/*/home" ],
+		"js": [ "content-home.js" ],
+		"run_at": "document_start" }, {
+		"matches": [ "*://echo360.org.uk/media/*/*" ],
+		"js": [ "content-media.js" ],
+		"run_at": "document_start" } ],
+	"browser_action": {
+		"default_icon": { "48": "icons/48.png", "96": "icons/96.png" },
+		"default_title": "echo360 Video Scraper",
+		"default_popup": "popup.html",
+		"browser_style": true }
+}
