@@ -8,6 +8,8 @@ The following executables are required to be in `PATH`:
 
 - `ffmpeg`
 - `ffprobe`
+- `nice`
+- `cpulimit`
 
 The following python libraries are required:
 
