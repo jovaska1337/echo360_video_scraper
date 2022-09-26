@@ -39,7 +39,9 @@ page with one of the following urls:
 - `https://echo360.org.uk/media/<uuid>/\*`
 
 1. Navigate to an echo360 classroom or media page with an url like the
-   ones above on a browser with the extension installed.
+   ones above on a browser with the extension installed. **DO NOT USE A
+   PRIVATE WINDOW, THIS CAUSES THE WRONG COOKIES TO BE EXTRACTED AND
+   YOU'LL GET AN ERROR WHEN DOWNLOADING**
 2. Open the extension popup. (refresh the page if nothing shows up)
 3. Select the streams you want to download. (`/media` pages always show one)
 4. Click `Go`.
