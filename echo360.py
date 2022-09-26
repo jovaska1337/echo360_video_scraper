@@ -592,18 +592,21 @@ def remove(path):
 
 global_index = None
 
-def auto_index():
+def auto_index(hint):
     global global_index
 
     if global_index == None:
         global_index = 0
         
-        for file in os.listdir():
+        for file in sorted(os.listdir()):
             m = RE_IND.match(file)
             if not m:
                 continue
 
             j = int(m.group(0))
+
+            if file.find(hint) != -1:
+                break
 
             if j >= global_index:
                 global_index = j + 1
@@ -667,7 +670,12 @@ def main():
 
                     elif key == "index":
                         if val == "auto":
-                            files[index][2] = auto_index()
+                            # name is required for hint, the extension
+                            # should output it before the index
+                            if files[index][0] == None:
+                                raise RuntimeError("Index before name.")
+
+                            files[index][2] = auto_index(files[index][0])
                         else:
                             files[index][2] = int(val)
                         increment = True
@@ -1029,7 +1037,6 @@ def main():
                         if abs(s_out["duration"] - s_1["duration"]) \
                             > MAX_DURATION_MISMATCH:
                             print("  Exists but duration doesn't match.")
-                            continue
 
                         print("  Exists.")
                         continue
