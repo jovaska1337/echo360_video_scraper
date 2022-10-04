@@ -1037,7 +1037,7 @@ def main():
                         t_1 = s_out["duration"]
                         t_2 = s_1["duration"]
 
-                        if not (t_1.isdigit() and t_2.isdigit()) \
+                        if isinstance(t_1, str) or isinstance(t_2, str) \
                             or (abs(t_1 - t_2) > MAX_DURATION_MISMATCH):
                             print("  Exists but duration doesn't match.")
 
