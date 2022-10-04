@@ -1034,16 +1034,24 @@ def main():
                     try:
                         s_out = ffprobe(out)
 
-                        if abs(s_out["duration"] - s_1["duration"]) \
-                            > MAX_DURATION_MISMATCH:
+                        t_1 = s_out["duration"]
+                        t_2 = s_1["duration"]
+
+                        if not (t_1.isdigit() and t_2.isdigit()) \
+                            or (abs(t_1 - t_2) > MAX_DURATION_MISMATCH):
                             print("  Exists but duration doesn't match.")
 
-                        print("  Exists.")
-                        continue
+                        else:
+                            print("  Exists.")
+                            continue
 
                     # this is fine, as we'll just re-encode/remux
                     except RuntimeError:
                         print("  Exists but corrupt.")
+
+                    # remove file
+                    print("  Removing '{}'.".format(out))
+                    remove(out)
 
                 if DUAL_PASS and encode:
                     pass_1 = cmd[:]
