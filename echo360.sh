@@ -21,5 +21,5 @@ if [ ! -f "$INPUT" ]; then
 fi
 
 # call script
-python "`script_path`/echo360.py" < "$INPUT" \
+python "`script_path`/echo360.py" "$@" < "$INPUT" \
 	&& rm "$INPUT"
