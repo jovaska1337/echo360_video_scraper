@@ -619,6 +619,12 @@ def auto_index(hint):
 def main():
     global interrupt
 
+    # swap video streams
+    if "swap" in sys.argv[1:]:
+        swap = True
+    else:
+        swap = False
+
     ret = 0
 
     files = []
@@ -833,9 +839,14 @@ def main():
 
             # 3 streams
             elif bitmap == 7:
-                s_scr = tmp[1]
-                s_lay = tmp[2]
-                s_snd = tmp[0]
+                if swap:
+                    s_scr = tmp[2]
+                    s_lay = tmp[1]
+                    s_snd = tmp[0]
+                else:
+                    s_scr = tmp[1]
+                    s_lay = tmp[2]
+                    s_snd = tmp[0]
 
             # impossible
             else:
