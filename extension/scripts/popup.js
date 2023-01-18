@@ -1,22 +1,9 @@
 "use strict";
 
-const MSG_INIT = 0;
-const MSG_LIST = 1;
-const MSG_WORK = 2;
-const MSG_STAT = 3;
-const MSG_WAIT = 4;
+const SUBMIT_GO = 0;
+const SUBMIT_RD = 1;
 
-const WORK_INIT = 0;
-const WORK_BUSY = 1;
-const WORK_DONE = 2;
-
-const STATE_WORK = 0;
-const STATE_IDLE = 1;
-
-const SUBMIT_GO     = 0;
-const SUBMIT_RELOAD = 1;
-
-let title, form, form_list, submit_button, tab, busy = false;
+let title, form, form_list, submit_button, tab, busy = false, auto = false;
 
 const create_checkbox = (name) => {
 	const [item, span, input, label] =
@@ -28,6 +15,11 @@ const create_checkbox = (name) => {
 
 	input.addEventListener("click", (e) => e.preventDefault());
 	span.addEventListener("click", (e) => {
+		e.preventDefault();
+
+		if (input.getAttribute("disabled") != null)
+			return;
+
 		input.checked ^= 1;
 		input.dispatchEvent(new InputEvent("input"));
 	});
@@ -53,35 +45,75 @@ const page_ready = async () => {
 
 	resp = await browser.tabs
 		.sendMessage(tab.id, { type: MSG_LIST });
+	resp = resp.list;
 
-	if (resp.list.length > 0) {
+	/* count entries */
+	let count = 0;
+	for (const value of Object.values(resp))
+		count += value.length;
+
+	const entries = [];
+
+	if (count > 0) {
 		form_list.appendChild(create_spacer());
 
 		const [item_all, input_all] =
 			create_checkbox("Select All");
 
+		const [item_auto, input_auto] =
+			create_checkbox("Force Autoindex");
+
 		const all = [];
 
 		input_all.addEventListener("input", () => {
 			for (const input of all)
+			{
+				if (input.getAttribute("disabled") != null)
+					continue;
 				input.checked = input_all.checked;
+			}
 		});
 
+		input_auto.addEventListener("input",
+			() => auto = input_auto.checked);
+
 		form_list.appendChild(item_all);
+		form_list.appendChild(item_auto);
 		form_list.appendChild(create_spacer());
 
-		for (let i = 0; i < resp.list.length; i++)
+		let i = 0;
+
+		/* process by category */
+		for (const key of Object.keys(resp))
 		{
-			const [item, input] =
-				create_checkbox(resp.list[i]);
+			/* category name? */
+			if (key.length > 0) {
+				const name = document.createElement("h4");
+				name.textContent = key;
+				form_list.appendChild(name);
+			}
 
-			input.name = i;
-			all.push(input);
+			/* add entries */
+			for (const entry of resp[key])
+			{
+				const [item, input] =
+					create_checkbox(entry.name + (
+						(entry.available) ?
+						"" : " (unavailable)"));
 
-			form_list.appendChild(item);
+				if (!entry.available)
+					input.setAttribute("disabled", "");
+
+				entry.index = input.name = i++;
+				all.push(input);
+				form_list.appendChild(item);
+
+				/* add to entries */
+				entries.push(entry);
+			}
+
+			form_list.appendChild(create_spacer());
 		}
-
-		form_list.appendChild(create_spacer());
 
 		const [item_submit, input_submit] = ["li", "input"]
 			.map((a) => document.createElement(a))
@@ -115,13 +147,10 @@ const page_ready = async () => {
 		title.textContent = "WORKING...";
 		submit_button.setAttribute("disabled", "");
 		busy = true;
-		
-		await browser.tabs.sendMessage(
-			tab.id, { type: MSG_WAIT });
-
 		break;
 	}
 
+	return entries;
 };
 
 const page_failed = async () => {
@@ -132,12 +161,14 @@ const page_failed = async () => {
 
 	//input.type = "submit";
 	//input.value = "Reload";
-	//input.action = SUBMIT_RELOAD;
+	//input.action = SUBMIT_RD;
 
 	//item.appendChild(input);
 	//form_list.appendChild(create_spacer());
 	//form_list.appendChild(item);
 };
+
+let entries = null;
 
 const render_page = async () => {
 	let failed = false;
@@ -146,16 +177,18 @@ const render_page = async () => {
 		form_list.removeChild(form_list.childNodes[0]);
 
 	try {
-		const resp = await browser.tabs
+		await browser.tabs
 			.sendMessage(tab.id, { type: MSG_INIT });
 	} catch {
-		failed = true	
+		failed = true;
 	}
 
-	if (failed)
+	if (failed) {
 		await page_failed();
-	else
-		await page_ready();
+		entries = [];
+	} else {
+		entries = await page_ready();
+	}
 };
 
 browser.runtime.onMessage.addListener((msg, sender, respond) => {
@@ -186,7 +219,15 @@ addEventListener("load", async () => {
 				return;
 
 			const resp = await browser.tabs
-				.sendMessage(tab.id, { type: MSG_WORK, data: keys });
+				.sendMessage(tab.id, {
+					type: MSG_WORK,
+					data: entries
+					.filter((e, i) => keys.indexOf(i) != -1)
+					.map(e => ({
+						name : e.name,
+						uuid : e.uuid,
+						index: e.index })),
+						auto : auto });
 
 			if (resp.state == WORK_INIT) {
 				title.textContent = "WORKING...";
@@ -195,7 +236,7 @@ addEventListener("load", async () => {
 			}
 			break;
 
-		case SUBMIT_RELOAD:
+		case SUBMIT_RD:
 			await render_page();
 			break;
 		}

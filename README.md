@@ -25,25 +25,26 @@ The following python libraries are required:
 
 If you answered yes, this tool is for you.
 
-The reason the tool is split up into two parts is that the process of
-making the python script jump through all the ridiculous hoops required
-to retreive the stream urls and authentication cookies is frankly impossible.
-Using the existing browser session to retreive metadata through and extension
-is the simplest and easiest way to implement this.
+The reason the tool is split up into two parts is that we would literally have
+to implement a fully fledged web browser in python in order to be able to
+log in and retreive the required authentication cookies. Thus the job of
+returning the stream URLs and authentication cookies is delegated to a browser
+extension. (Firefox only)
 
 #### Instructions
 To use the browser extension, you have to be on on an echo360.org.uk
 page with one of the following urls:
 
 - `https://echo360.org.uk/section/<uuid>/home`
-- `https://echo360.org.uk/media/<uuid>/\*`
+- `https://echo360.org.uk/lesson/<uuid>/classroom`
+- `https://echo360.org.uk/media/<uuid>/*`
 
 1. Navigate to an echo360 classroom or media page with an url like the
-   ones above on a browser with the extension installed. **DO NOT USE A
-   PRIVATE WINDOW, THIS CAUSES THE WRONG COOKIES TO BE EXTRACTED AND
-   YOU'LL GET AN ERROR WHEN DOWNLOADING**
+   ones above on a browser with the extension installed. (private windows
+   and container tabs are now supported)
 2. Open the extension popup. (refresh the page if nothing shows up)
-3. Select the streams you want to download. (`/media` pages always show one)
+3. Select the streams you want to download. (`/media` and `/classroom`
+   pages always show one)
 4. Click `Go`.
 5. After the tool scrapes the authentication cookies and video stream urls,
    you'll be prompted to save a file called `echo360.txt`. `echo360.py` will

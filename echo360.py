@@ -8,11 +8,13 @@ import time
 import signal
 import hashlib
 import requests
+import posixpath
 import subprocess
 
-from requests.adapters import HTTPAdapter
+from urllib.parse        import urlparse
+from requests.adapters   import HTTPAdapter
 from urllib3.poolmanager import PoolManager
-from urllib3.util.ssl_ import create_urllib3_context
+from urllib3.util.ssl_   import create_urllib3_context
 
 interrupt = False # SIGINT should raise KeyboardInterrupt
 
@@ -24,9 +26,11 @@ signal.signal(signal.SIGINT, on_SIGINT)
 
 ######################## CONFIGURATION ########################
 
-THREADS  = 4
+#THREADS  = 4
+THREADS  = 8
 NICENESS = 20
-CPULIMIT = 50
+#CPULIMIT = 50
+CPULIMIT = 100
 
 # configure video codec here
 VIDEO_CODEC = [
@@ -105,7 +109,7 @@ AF_1 = "[0:0]pan=mono|c{}=FL[aout]"
 
 RE_META   = re.compile("^\s*#\s*(\S+)\s*:\s*(.+)$")
 RE_SPACE  = re.compile("^\s*$")
-RE_STREAM = re.compile("^(s([012])q([01])\.m4s);(https://[^/]+/\S+)")
+RE_STREAM = re.compile("^([0-9]+);(https://[^/]+/\S+)")
 
 RE_IND = re.compile("[0-9]{2}\\b")
 
@@ -558,7 +562,7 @@ def request(url, dst=None, data=None, stats=None, s=None, interval=500, chunk_si
         #import traceback
         #print(traceback.format_exc())
 
-        if isinstance(dst, bytearray):
+        if (dst == None) or isinstance(dst, bytearray):
             return None
         else:
             return False
@@ -616,6 +620,150 @@ def auto_index(hint):
 
     return i
 
+def HLS_line(line):
+    # remove whitespace
+    line = line.strip()
+
+    # stream url
+    if line[0] != "#":
+        return (None, line)
+    
+    # metadata
+    line = line[1:]
+    line = line.split(":", 1)
+
+    # no value
+    if len(line) == 1:
+        return (line, None)
+  
+    # key value pair
+    key, val = line
+    val = val.split(",")
+    tmp = {}
+    for entry in val:
+        entry = [x.strip() for x in entry.split("=", 1)]
+        if (len(entry) == 1) or (len(entry[1]) < 1):
+            tmp[entry[0]] = None
+        else:
+            if entry[1][0] == "\"" and entry[1][-1] == "\"":
+                entry[1] = entry[1][1:-1]
+                if len(entry[1]) < 1:
+                    entry[1] = None
+            else:
+                try:
+                    entry[1] = int(entry[1])
+                except ValueError:
+                    pass
+            tmp[entry[0].lower()] = entry[1]
+
+    return (key, tmp)
+
+# FIXME: this isn't a proper HLS parser
+def HLS_parse(url, data):
+    # split into lines (strip empty)
+    lines = list(filter(len, [str( \
+        x.strip(), "ascii") for x in data.split(b"\n")]))
+
+    # sanity check
+    if lines[0] != "#EXTM3U":
+        raise RuntimeError("Invalid HLS stream.")
+
+    # parse stream
+    out = {}
+    grp = None
+    tgt = None
+    for line in lines:
+        key, val = HLS_line(line)
+        # stream url
+        if key == None:
+            src = urlparse(url)
+            dst = urlparse(val)
+
+            # handle relative path
+            if dst.path[0] != "/":
+                dst = dst._replace(path= \
+                    posixpath.abspath(posixpath.join( \
+                    posixpath.dirname(src.path), dst.path)))
+            
+            # copy non-emptry fields
+            if len(dst.scheme) < 1:
+                dst = dst._replace(scheme=src.scheme)
+            if len(dst.netloc) < 1:
+                dst = dst._replace(netloc=src.netloc)
+            if len(dst.params) < 1:
+                dst = dst._replace(params=src.params)
+            if len(dst.query) < 1:
+                dst = dst._replace(query=src.query)
+            if len(dst.fragment) < 1:
+                dst = dst._replace(fragment=src.fragment)
+
+            # convert back to url
+            val = dst.geturl()
+
+            # default group
+            if tgt == None:
+                grp = out["__default__"] = {}
+                grp["__streams__"]  = []
+                tgt = {}
+                grp["__streams__"].append(tgt)
+
+            tgt["__url__"] = val
+
+        # stream info
+        elif key == "EXT-X-STREAM-INF":
+            # group id
+            if "video" in val:
+                name = val["video"]
+                del val["video"]
+            elif "audio" in val:
+                name = val["audio"]
+                del val["audio"]
+            else:
+                name = "__default__"
+
+            # select/create group
+            if not name in out:
+                grp = out[name] = {}
+                grp["__streams__"] = []
+            else:
+                grp = out[name]
+
+            # add to group
+            tgt = {}
+            tgt.update(val)
+            grp["__streams__"].append(tgt)
+
+        # group info
+        elif key == "EXT-X-MEDIA":
+            # select group id
+            if "group-id" in val:
+                name = val["group-id"]
+                del val["group-id"]
+            else:
+                name = "__default__"
+
+            # select/create group
+            if not name in out:
+                grp = out[name] = {}
+                grp["__streams__"] = []
+            else:
+                grp = out[name]
+
+            # update
+            grp.update(val)
+
+    return out
+
+def url_ext(url):
+    url = urlparse(url)
+    ext = posixpath.basename(url.path)
+    ext = ext.rsplit(".", 1)
+    if len(ext) == 2:
+        ext = ext[1]
+    return ext
+
+stream_types = ["audio", "main video", "secondary video"]
+
 def main():
     global interrupt
 
@@ -648,6 +796,7 @@ def main():
                 line = line[:-1]
 
                 if index == len(files):
+                    # name, uuid, index, streams
                     files.append([None, None, None, []])
 
                 m = RE_SPACE.match(line)
@@ -690,12 +839,14 @@ def main():
 
                 m = RE_STREAM.match(line)
                 if m:
-                    src = m.group(1)
-                    url = m.group(4)
-                    s = int(m.group(2))
-                    q = int(m.group(3))
+                    i = int(m.group(1))
+                    url = m.group(2) 
 
-                    files[index][3].append([src, url, s, q])
+                    # append to context
+                    target = files[index][3]
+                    while len(target) <= i:
+                        target.append(None)
+                    target[i] = url
 
                     increment = True
                     continue
@@ -710,18 +861,6 @@ def main():
         if interrupted:
             raise KeyboardInterrupt()
 
-        print("Selecting highest qualities...")
-        for _, _, _, streams in files:
-            for _, _, i, q in streams:
-                j = 0
-                while j < len(streams):
-                    _, _, _i, _q = streams[j]
-
-                    if (_i == i) and (_q < q):
-                        streams.pop(j)
-                    else:
-                        j += 1
-
         # create session with cookies
         session = get_session()
         for key in cookies:
@@ -733,15 +872,19 @@ def main():
 
             print("File[{}]: '{}'".format(index, name))
 
-            for j, stream in enumerate(streams):
-                src, url, s, q = stream
+            # sanity check
+            if len(streams) > 3:
+                print("  WARNING: Truncating streams.")
+                streams = streams[:3]
 
-                dst = hashlib.md5(bytes(uuid, "utf-8")).hexdigest() \
-                    + "-stream-" + str(s) + ".m4s"
+            for j, url in enumerate(streams):
+                dst = "{}-stream-{}".format(
+                    hashlib.md5(bytes(uuid, "utf-8")).hexdigest(), str(j))
 
-                streams[j].append(dst)
+                # modify stream entry
+                streams[j] = (j, dst)
 
-                print("  Downloading '{}' ('{}'):".format(dst, src))
+                print("  Downloading '{}' ({})...".format(dst, stream_types[j]))
 
                 if os.path.isfile(dst):
                     try:
@@ -766,30 +909,68 @@ def main():
                         break
 
                 try:
-                    interrupt = True
+                    try:
+                        interrupt = True
+                       
+                        if url_ext(url) == "m3u8":
+                            print("  Retreiving stream metadata...")
+                            info = request(url, s=session, stats=progress)
+                            if info == None:
+                                raise RuntimeError("")
 
-                    with open(dst, "wb") as fp:
-                        status = request(url, dst=fp, s=session, stats=progress)
+                            # parse HLS
+                            info = HLS_parse(url, info)
+                            if j == 0:
+                                group = "group_audio"
+                            else:
+                                group = "__default__"
+                            if not group in info:
+                                raise RuntimeError("Stream missing group.")
 
-                    if not status:
+                            # select stream with best resolution (bandwitdth)
+                            s = info[group]["__streams__"]
+                            if len(s) < 1:
+                                raise RuntimeError("No s.")
+                            s.sort(key=lambda x: x["bandwidth"], reverse=True)
+                            stream = s[0]
+
+                            # sanity check
+                            if not "__url__" in stream:
+                                raise RuntimeError("Stream missing URL.")
+                            url = stream["__url__"] 
+
+                            # replace m3u8 with m4s -> enough for echo360
+                            url = url.replace("m3u8", "m4s")
+
+                            print("  Downloading stream...")
+
+                        # download stream
+                        with open(dst, "wb") as fp:
+                            status = request(url, dst=fp, s=session, stats=progress)
+                        if not status:
+                            raise RuntimeError("")
+
+                    except RuntimeError as e:
+                        msg = str(e)
+                        if len(msg) > 0:
+                            print("    Error: {}".format(msg))
                         errored = True
-                        try:
-                            remove(dst)
-                        except RuntimeError as e:
-                            print("    Error: {}".format(e))
+
+                    #interrupt = True
+                    #with open(dst, "wb") as fp:
+                    #    status = request(url, dst=fp, s=session, stats=progress)
 
                 except KeyboardInterrupt:
                     print("\r    Interrupted.")
-
-                    try:
-                        remove(dst)
-                    except RuntimeError as e:
-                        print("    Error: {}".format(e))
-
                     interrupted = True
                     break
                 
                 finally:
+                    if errored or interrupted:
+                        try:
+                            remove(dst)
+                        except RuntimeError as e:
+                            print("    Error: {}".format(e))
                     interrupt = False
 
             if interrupted:
@@ -806,9 +987,7 @@ def main():
             ids = []
             tmp = []
 
-            for stream in streams:
-                _, _, q, _, dst = stream
-
+            for q, dst in streams:
                 # if the actual file is missing, don't add anything
                 # so that the below code can handle the error
                 if not os.path.isfile(dst):
@@ -854,18 +1033,24 @@ def main():
                 s_lay = None
                 s_snd = None
 
-            # we use nice and cpulimit
-            # to reduce lag and CPU usage
+            # set niceness to allow smooth desktop usage
             cmd = [
                 "nice",
                 "-n", str(NICENESS),
-                "--",
-                "cpulimit",
-                "-l", str(CPULIMIT),
-                "-f", "-m", "-q",
-                "--",
-                "ffmpeg"
+                "--"
             ]
+
+            # optionally use cpulimit
+            if CPULIMIT < 100:
+                cmd.extend([
+                    "cpulimit",
+                    "-l", str(CPULIMIT),
+                    "-f", "-m", "-q",
+                    "--"
+                ])
+
+            # ffmpeg
+            cmd.append("ffmpeg")
             cmd.extend(GLOBAL_OPTS)
 
             out = "{:02} - {}".format(index, name) 
