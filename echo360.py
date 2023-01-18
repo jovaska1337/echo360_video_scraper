@@ -1313,9 +1313,9 @@ def main():
         else:
             print("Cleaning up...")
             for _, _, _, streams in files:
-                for stream in streams:
+                for q, dst in streams:
                     try:
-                        remove(stream[4])
+                        remove(dst)
                     except RuntimeError as e:
                         print("  Error: {}".format(e))
 
