@@ -609,7 +609,7 @@ def auto_index(hint):
 
             j = int(m.group(0))
 
-            if file.find(hint) != -1:
+            if file.lower().find(hint.lower()) != -1:
                 break
 
             if j >= global_index:
@@ -884,7 +884,7 @@ def main():
                 # modify stream entry
                 streams[j] = (j, dst)
 
-                print("  Downloading '{}' ({})...".format(dst, stream_types[j]))
+                print("  Downloading '{}' ({}):".format(dst, stream_types[j]))
 
                 if os.path.isfile(dst):
                     try:
@@ -919,15 +919,24 @@ def main():
                                 raise RuntimeError("")
 
                             # parse HLS
-                            info = HLS_parse(url, info)
-                            if j == 0:
-                                group = "group_audio"
+                            info  = HLS_parse(url, info)
+                            group = None
+                            for tmp in ["audio_group", \
+                                "video_group", "__default__"]:
+                                if tmp in info:
+                                    group = tmp
+                                    break
+                            # fallaback (shouldn't be possible)
                             else:
-                                group = "__default__"
-                            if not group in info:
-                                raise RuntimeError("Stream missing group.")
+                                keys = info.keys()
+                                if len(keys) < 1:
+                                    raise RuntimeError("Stream missing group.")
+                                else:
+                                    group = keys[0]
+                                    print("  WARNING: Falling back " \
+                                        "unknown group '{}'.".format(group))
 
-                            # select stream with best resolution (bandwitdth)
+                            # select stream with best resolution (bandwidth)
                             s = info[group]["__streams__"]
                             if len(s) < 1:
                                 raise RuntimeError("No s.")
@@ -946,7 +955,8 @@ def main():
 
                         # download stream
                         with open(dst, "wb") as fp:
-                            status = request(url, dst=fp, s=session, stats=progress)
+                            status = request(url, dst=fp, \
+                                s=session, stats=progress)
                         if not status:
                             raise RuntimeError("")
 
@@ -955,10 +965,6 @@ def main():
                         if len(msg) > 0:
                             print("    Error: {}".format(msg))
                         errored = True
-
-                    #interrupt = True
-                    #with open(dst, "wb") as fp:
-                    #    status = request(url, dst=fp, s=session, stats=progress)
 
                 except KeyboardInterrupt:
                     print("\r    Interrupted.")
