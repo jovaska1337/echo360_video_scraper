@@ -35,6 +35,22 @@ const streams = async list => {
 
 		/* extract stream info */
 		entry.streams = metadata.classroomApp.video.playableMedias;
+
+		/* compactify echo360.txt by extracting params */
+		if (entry.streams.length > 0) {
+			entry.params = {};
+
+			for (const param of entry.streams[0].uri.split("?")[1].split("&"))
+			{
+				const [key, value] = param.split("=");
+				entry.params[key] = value; 
+			}
+		} else {
+			entry.params = null;
+		}
+
+		for (const stream of entry.streams)
+			stream.uri = stream.uri.split("?")[0];
 	}
 
 	return list;

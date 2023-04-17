@@ -66,7 +66,7 @@ browser.runtime.onMessage.addListener((msg, sender, respond) => {
 			/* respond */
 			respond({ type: MSG_COOK, cookies: cookies });
 		})
-		.catch(() => respond(MSG_COOK_NULL));
+		.catch((e) => respond(MSG_COOK_NULL));
 
 		ret = true;
 		break;

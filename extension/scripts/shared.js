@@ -57,19 +57,32 @@ const download = data => {
 	let output = "";
 
 	/* append cookies */
-	for (const key of Object.keys(data.cookies))
-		output += `# cookie: ${key}=${data.cookies[key]}\n`;
-	output += "\n";
+	if (data.cookies != null) {
+		const keys = Object.keys(data.cookies);
+
+		for (const key of keys)
+			output += `# cookie: ${key}=${data.cookies[key]}\n`;
+
+		if (keys.length > 0)
+			output += "\n";
+	}
 	
 	/* append streams */
 	for (const entry of data.data)
 	{
+		console.log(entry);
+
 		/* header */
 		output += `# name: ${entry.name}\n`;
 		output += `# uuid: ${entry.uuid}\n`;
 		output += `# index: ${
 			data.auto || (entry.index < 0)
 				? "auto" : entry.index }\n`;
+		if (entry.params != null) {
+			const keys = Object.keys(entry.params);
+			for (const key of keys)
+				output += `# param: ${key}=${entry.params[key]}\n`;
+		}
 
 		/* select best streams */
 		const streams = {};

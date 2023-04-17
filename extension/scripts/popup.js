@@ -224,10 +224,11 @@ addEventListener("load", async () => {
 					data: entries
 					.filter((e, i) => keys.indexOf(i) != -1)
 					.map(e => ({
-						name : e.name,
-						uuid : e.uuid,
-						index: e.index })),
-						auto : auto });
+						name  : e.name,
+						uuid  : e.uuid,
+						index : e.index,
+						params: e.params })),
+						auto  : auto });
 
 			if (resp.state == WORK_INIT) {
 				title.textContent = "WORKING...";

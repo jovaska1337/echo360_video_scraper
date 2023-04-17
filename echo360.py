@@ -776,6 +776,7 @@ def main():
     ret = 0
 
     files = []
+    params = {}
     cookies = {}
 
     index = 0
@@ -796,8 +797,8 @@ def main():
                 line = line[:-1]
 
                 if index == len(files):
-                    # name, uuid, index, streams
-                    files.append([None, None, None, []])
+                    # name, uuid, index, streams, params
+                    files.append([None, None, None, [], ""])
 
                 m = RE_SPACE.match(line)
                 if m:
@@ -814,6 +815,26 @@ def main():
                     if key == "cookie":
                         tmp_1, tmp_2 = val.split("=", 1)
                         cookies[tmp_1] = tmp_2
+
+                    elif key == "param":
+                        key = val.split("=", 1)[0]
+
+                        if key in [
+                            # apparently, the CDN is very picky
+                            # about which GET parameters should
+                            # be present in requests
+                            "x-src",
+                            "x-instid",
+                            "x-uid",
+                            "Policy",
+                            "Signature",
+                            "Key-Pair-Id"
+                        ]:
+                            if len(files[index][4]) < 1:
+                                files[index][4] += "?"
+                            else:
+                                files[index][4] += "&"
+                            files[index][4] += val
 
                     elif key == "name":
                         files[index][0] = val.replace("/", "-");
@@ -868,7 +889,7 @@ def main():
             session.cookies.set(key, val)
 
         print("Downloading streams...")
-        for name, uuid, index, streams in files:
+        for name, uuid, index, streams, params in files:
 
             print("File[{}]: '{}'".format(index, name))
 
@@ -878,6 +899,9 @@ def main():
                 streams = streams[:3]
 
             for j, url in enumerate(streams):
+                # append parameters
+                url += params
+
                 dst = "{}-stream-{}".format(
                     hashlib.md5(bytes(uuid, "utf-8")).hexdigest(), str(j))
 
@@ -921,8 +945,8 @@ def main():
                             # parse HLS
                             info  = HLS_parse(url, info)
                             group = None
-                            for tmp in ["audio_group", \
-                                "video_group", "__default__"]:
+                            for tmp in ["group_audio", \
+                                "group_video", "__default__"]:
                                 if tmp in info:
                                     group = tmp
                                     break
@@ -932,9 +956,9 @@ def main():
                                 if len(keys) < 1:
                                     raise RuntimeError("Stream missing group.")
                                 else:
-                                    group = keys[0]
+                                    group = next(iter(keys))
                                     print("  WARNING: Falling back " \
-                                        "unknown group '{}'.".format(group))
+                                        "to unknown group '{}'.".format(group))
 
                             # select stream with best resolution (bandwidth)
                             s = info[group]["__streams__"]
@@ -986,7 +1010,7 @@ def main():
             raise KeyboardInterrupt()
 
         print("Merging streams...")
-        for name, uuid, index, streams in files:
+        for name, uuid, index, streams, _ in files:
             
             print("File[{}]: '{}'".format(index, name))
 
@@ -1312,7 +1336,7 @@ def main():
 
         else:
             print("Cleaning up...")
-            for _, _, _, streams in files:
+            for _, _, _, streams, _ in files:
                 for q, dst in streams:
                     try:
                         remove(dst)

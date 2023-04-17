@@ -69,7 +69,6 @@ browser.runtime.onMessage.addListener((msg, sender, respond) => {
 
 const onload = async () => {
 	/* wait for cookies */
-	cookies = await cookies;
 
 	/* parse metadata */
 	const metadata = parse(document.body.innerHTML);
@@ -83,29 +82,132 @@ const onload = async () => {
 			&& !info.video.liveTimeAvailable;
 
 		/* data is on the page */
-		list[""] = [{
+		const entry = {
 			name     : info.lesson.name,
 			uuid     : info.lesson.id,
-			available: available }];
+			available: available };
+		list[""] = [entry];
 
 		streams = info.video.playableMedias;
+
+		/* fuck this nonsense */
+		if (streams.length > 0) {
+			entry.params = {};
+			
+			for (const param of streams[0].uri.split("?")[1].split("&"))
+			{
+				const [key, value] = param.split("=");
+				entry.params[key] = value; 
+			}
+
+			for (const stream of streams)
+				stream.uri = stream.uri.split("?")[0];
+		} else {
+			entry.params = null;
+		}
 
 	/* media */
 	} else if (metadata.mediaPlayerBootstrapApp !== undefined) {
 		const info = metadata.mediaPlayerBootstrapApp;
 
-		/* fetch the external JSON */
-		const json = (await ((await fetch(
-`https://echo360.org.uk/api/ui/echoplayer/public-links/${info.publicLinkId}/media/${info.mediaId}/player-properties`
-			)).json())).data;
+		/* if some retard thinks this authentication token nonsense is 
+		 * anything other than security theater, they can fuck right off
+		 */
+
+		/* wait for boot.js to set authentication token */
+		let n = 0, token = null;
+		while (1)
+		{
+			if (n >= 5)
+				throw Error("No authentication token. (logic changed?)");
+
+			/* attempt to get token */
+			if ((token = localStorage.getItem("authn-jwt")) != null)
+				break;
+
+			/* wait for 1 second */
+			await new Promise(resolve => setTimeout(resolve, 1000));
+
+			n++;
+		}
+
+		/* attempt to retreive external JSON */
+		n = 0;
+		let json = null;
+		while (1)
+		{
+			if (n >= 5)
+				throw Error("Failed to retreive player info. (broken again?)");
 		
+			try {
+				/* null token means we try again */
+				if (token == null)
+					throw Error("Catch this mothafucka.");
+
+				/* headers for request */
+				const headers = new Headers();
+				headers.append("Authorization", `Bearer ${token}`);
+
+				/* request player json */
+				const response = await fetch(
+`https://echo360.org.uk/api/ui/echoplayer/public-links/${info.publicLinkId}/media/${info.mediaId}/player-properties`
+				, { headers: headers });
+
+				/* looks ugly, but whatever */
+				json = await response.json();
+				json = json.data;
+
+				break;
+			} catch (e) {
+				/* get new token */
+				token = localStorage.getItem("authn-jwt");
+
+				/* wait for 1 second */
+				await new Promise(resolve => setTimeout(resolve, 1000));
+
+				n++;
+			}
+		}
+
 		/* always available */
-		list[""] = [{
+		const entry = {
 			name     : json.mediaName,
 			uuid     : info.mediaId,
-			available: true }];
+			available: true };
+		list[""] = [entry];
 
 		streams = json.playableAudioVideo.playableMedias;
+		
+		console.log(json);
+
+		if (streams.length > 0) {
+			entry.params = {};
+			
+			for (const param of streams[0].uri.split("?")[1].split("&"))
+			{
+				const [key, value] = param.split("=");
+				entry.params[key] = value; 
+			}
+
+			/* this may break but I'm not making it better until it does */
+			if (json.sourceQueryStrings != null) {
+				if (json.sourceQueryStrings.queryStrings.length != 1)
+					throw Error("Broken. :P");
+
+				/* what kind of an idiot comes up with this nonsense */
+				for (const param of json.sourceQueryStrings
+					.queryStrings[0].queryString.split("&"))
+				{
+					const [key, value] = param.split("=");
+					entry.params[key] = value; 
+				}
+			}
+
+			for (const stream of streams)
+				stream.uri = stream.uri.split("?")[0];
+		} else {
+			entry.params = null;
+		}
 	}
 
 	/* respond to early MSG_INIT */
