@@ -69,6 +69,7 @@ browser.runtime.onMessage.addListener((msg, sender, respond) => {
 
 const onload = async () => {
 	/* wait for cookies */
+	cookies = await cookies;
 
 	/* parse metadata */
 	const metadata = parse(document.body.innerHTML);
