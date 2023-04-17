@@ -70,8 +70,6 @@ const download = data => {
 	/* append streams */
 	for (const entry of data.data)
 	{
-		console.log(entry);
-
 		/* header */
 		output += `# name: ${entry.name}\n`;
 		output += `# uuid: ${entry.uuid}\n`;

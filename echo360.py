@@ -776,7 +776,6 @@ def main():
     ret = 0
 
     files = []
-    params = {}
     cookies = {}
 
     index = 0

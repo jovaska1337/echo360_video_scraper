@@ -178,8 +178,6 @@ const onload = async () => {
 
 		streams = json.playableAudioVideo.playableMedias;
 		
-		console.log(json);
-
 		if (streams.length > 0) {
 			entry.params = {};
 			
